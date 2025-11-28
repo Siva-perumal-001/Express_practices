@@ -31,7 +31,20 @@ app.get("/users",(req,res)=>{
     res.send(users)
 })
 
-app.get("/users/:id",(req,res)=>{
+const getUserIndex = (req,res,next)=>{
+    const uid = parseInt(req.params.id);
+    if(isNaN(uid)){
+        res.status(400).send({msg:"Bad request, Invalis Id"})
+    }
+    const userIndex = users.findIndex((user)=>user.id === uid);
+    if(userIndex === -1){
+        res.status(404).send({msg:"Id not found"});
+    }
+    req.userIndex = userIndex;
+    next();
+}
+
+app.get("/users/:id" ,(req,res)=>{
     const id = parseInt(req.params.id);
     if(isNaN(id)){
         return res.status(400).send({msg :"Bad request, invalid Id"})
@@ -73,43 +86,23 @@ app.post('/users',(req,res)=>{
     return res.status(201).send(newUser)
 })
 
-app.put("/users/:id",(req,res)=>{
+app.put("/users/:id" ,getUserIndex ,(req,res)=>{
+    const userIndex = req.userIndex;
     const uid = parseInt(req.params.id);
-    if(isNaN(uid)){
-        res.status(400).send({msg:"Bad request, Invalis Id"})
-    }
-    const userIndex = users.findIndex((user)=>user.id === uid);
-    if(userIndex === -1){
-        res.status(404).send({msg:"Id not found"});
-    }
     const {body} = req;
     users[userIndex] = {id:uid, ...body};
     res.status(200).send({msg:"User Updated"});
 })
 
-app.patch("/users/:id",(req,res)=>{
-    const uid = parseInt(req.params.id);
-    if(isNaN(uid)){
-        return res.status(400).send("Bad request , Inavlid ID");
-    }
-    const userIndex = users.findIndex((user)=> user.id === uid);
-    if(userIndex === -1){
-        res.status(404).send({msg:"Id not found"});
-    }
+app.patch("/users/:id" ,getUserIndex ,(req,res)=>{
+    const userIndex = req.userIndex;
     const {body} = req;
     users[userIndex] = { ...users[userIndex] , ...body };
     return res.sendStatus(200);
 })
 
-app.delete("/users/:id",(req,res)=>{
-    const uid = parseInt(req.params.id);
-    if(isNaN(uid)){
-        return res.status(400).send("Bad request ,Inavlid ID");
-    }
-    const userIndex = users.findIndex((user)=> user.id === uid);
-    if(userIndex === -1){
-        res.status(404).send({msg:"Id not found"});
-    }
+app.delete("/users/:id" ,getUserIndex ,(req,res)=>{
+    const userIndex = req.userIndex;
     users.splice(userIndex,1);
     return res.status(200).send({msg:"user deleted"});
 })
