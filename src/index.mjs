@@ -87,6 +87,32 @@ app.put("/users/:id",(req,res)=>{
     res.status(200).send({msg:"User Updated"});
 })
 
+app.patch("/users/:id",(req,res)=>{
+    const uid = parseInt(req.params.id);
+    if(isNaN(uid)){
+        return res.status(400).send("Bad request , Inavlid ID");
+    }
+    const userIndex = users.findIndex((user)=> user.id === uid);
+    if(userIndex === -1){
+        res.status(404).send({msg:"Id not found"});
+    }
+    const {body} = req;
+    users[userIndex] = { ...users[userIndex] , ...body };
+    return res.sendStatus(200);
+})
+
+app.delete("/users/:id",(req,res)=>{
+    const uid = parseInt(req.params.id);
+    if(isNaN(uid)){
+        return res.status(400).send("Bad request ,Inavlid ID");
+    }
+    const userIndex = users.findIndex((user)=> user.id === uid);
+    if(userIndex === -1){
+        res.status(404).send({msg:"Id not found"});
+    }
+    users.splice(userIndex,1);
+    return res.status(200).send({msg:"user deleted"});
+})
 
 app.listen(PORT,()=>{
     console.log(`App is running on PORT ${PORT}`)
