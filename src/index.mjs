@@ -24,6 +24,10 @@ app.get('/',(req,res)=>{
 })
 
 app.get("/users",(req,res)=>{
+    const {query:{filter,value}} = req;
+    if(filter && value){
+        return res.send(users.filter((user)=>user[filter].toLowerCase().includes(value)))
+    }
     res.send(users)
 })
 
@@ -39,12 +43,12 @@ app.get("/users/:id",(req,res)=>{
     res.status(404).send({msg: "user not found"})
 })
 
-app.listen(PORT,()=>{
-    console.log(`App is running on PORT ${PORT}`)
-})
-
 app.get('/products',(req,res)=>{
-    res.send(products);
+    const {query:{filter , value}} = req;
+    if(filter && value){
+        return res.send(products.filter((product)=>product[filter].toLowerCase().includes(value)))
+    }
+    res.send(products)
 })
 
 app.get('/products/:pid',(req,res)=>{
@@ -57,4 +61,33 @@ app.get('/products/:pid',(req,res)=>{
         return res.send(product)
     }
     res.status(404).send({msg : "product not found"})
+})
+
+app.use(express.json())
+
+app.post('/users',(req,res)=>{
+    console.log(req.body)
+    const {body} = req;
+    const newUser = {id: users[users.length-1].id+1, ...body}
+    users.push(newUser);
+    return res.status(201).send(newUser)
+})
+
+app.put("/users/:id",(req,res)=>{
+    const uid = parseInt(req.params.id);
+    if(isNaN(uid)){
+        res.status(400).send({msg:"Bad request, Invalis Id"})
+    }
+    const userIndex = users.findIndex((user)=>user.id === uid);
+    if(userIndex === -1){
+        res.status(404).send({msg:"Id not found"});
+    }
+    const {body} = req;
+    users[userIndex] = {id:uid, ...body};
+    res.status(200).send({msg:"User Updated"});
+})
+
+
+app.listen(PORT,()=>{
+    console.log(`App is running on PORT ${PORT}`)
 })
