@@ -1,119 +1,76 @@
 import express from "express";
-import { userValidatationSchema } from "./utils/ValidateSchemas.mjs";
-import { validationResult, matchedData, checkSchema } from "express-validator";
+import userRouter from './routes/users.mjs';
+import productRouter from './routes/products.mjs';
+import cookieParser from "cookie-parser";
+import session from "express-session";
+import { Strategy as LocalStrategy } from "passport-local";
+import passport from "passport";
+import { users } from "./utils/constants.mjs";
 
 const app = express();
 const PORT = 3000;
 
-const users = [
-    {id:1, user_name:"siva"},
-    {id:2, user_name:"ram"},
-    {id:3, user_name:"sivani"},
-    {id:4, user_name:"priya"},
-    {id:5, user_name:"lakshmi"}
-]
+app.use(express.json())
+app.use(cookieParser("siva"))
 
-const products = [
-    {pid:1, product_name:"laptop"},
-    {pid:2, product_name:"mobile"},
-    {pid:3, product_name:"headphones"},
-    {pid:4, product_name:"mouse"},
-    {pid:5, product_name:"keyboard"},
-]
+app.use(
+    session({
+        secret: "my password",
+        saveUninitialized: false,
+        resave: false,
+        cookie:{
+            maxAge: 60000 * 60 
+        }
+    })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.use(new LocalStrategy(
+    {usernameField: "user_name" , passwordField: "password" },
+    (user_name,password,done)=>{
+    const user = users.find((user)=>user.user_name === user_name);
+    if(!user){
+        return done(null, false, {message:"Invalid Username"})
+    }
+    if(user.password !== password){
+        return done(null, false, {message:"Incorrect Password"})
+    }
+    return done(null, user);
+}))
+
+passport.serializeUser((user,done)=>{
+    done(null,user.id)
+})
+
+passport.deserializeUser((id,done)=>{
+    const user = users.find((u)=> u.id === id)
+    done(null, user||false)
+})
+
+app.use(userRouter)
+app.use(productRouter)
 
 app.get('/',(req,res)=>{
+    res.cookie("Role","Admin",{maxAge:60000 * 60, signed:true});
+    console.log(req.session)
+    console.log(req.session.id)
     res.send({root:"Home"})
 })
 
-app.get("/users",(req,res)=>{
-    const {query:{filter,value}} = req;
-    if(filter && value){
-        return res.send(users.filter((user)=>user[filter].toLowerCase().includes(value)))
-    }
-    res.send(users)
-})
-
-const getUserIndex = (req,res,next)=>{
-    const uid = parseInt(req.params.id);
-    if(isNaN(uid)){
-        res.status(400).send({msg:"Bad request, Invalis Id"})
-    }
-    const userIndex = users.findIndex((user)=>user.id === uid);
-    if(userIndex === -1){
-        res.status(404).send({msg:"Id not found"});
-    }
-    req.userIndex = userIndex;
-    next();
-}
-
-app.get("/users/:id" ,(req,res)=>{
-    const id = parseInt(req.params.id);
-    if(isNaN(id)){
-        return res.status(400).send({msg :"Bad request, invalid Id"})
-    }
-    const user = users.find((user)=>user.id === id);
-    if(user){
-        return res.send(user);
-    }
-    res.status(404).send({msg: "user not found"})
-})
-
-app.get('/products',(req,res)=>{
-    const {query:{filter , value}} = req;
-    if(filter && value){
-        return res.send(products.filter((product)=>product[filter].toLowerCase().includes(value)))
-    }
-    res.send(products)
-})
-
-app.get('/products/:pid',(req,res)=>{
-    const pid = parseInt(req.params.pid);
-    if(isNaN(pid)){
-        return res.status(400).send({msg: "bad request, Invalid Id"})
-    }
-    const product = products.find((product)=> product.pid === pid )
-    if(product){
-        return res.send(product)
-    }
-    res.status(404).send({msg : "product not found"})
-})
-
-app.use(express.json())
-
-app.post('/users',
-    checkSchema(userValidatationSchema),
-    (req,res)=>{
-    const result = validationResult(req);
-    
-    if(!result.isEmpty()){
-        res.status(400).send({error:result.array()})
-    }
-
-    const body = matchedData(req);
-    const newUser = {id: users[users.length-1].id+1, ...body}
-    users.push(newUser);
-    return res.status(201).send(newUser)
-})
-
-app.put("/users/:id" ,getUserIndex ,(req,res)=>{
-    const userIndex = req.userIndex;
-    const uid = parseInt(req.params.id);
-    const {body} = req;
-    users[userIndex] = {id:uid, ...body};
-    res.status(200).send({msg:"User Updated"});
-})
-
-app.patch("/users/:id" ,getUserIndex ,(req,res)=>{
-    const userIndex = req.userIndex;
-    const {body} = req;
-    users[userIndex] = { ...users[userIndex] , ...body };
-    return res.sendStatus(200);
-})
-
-app.delete("/users/:id" ,getUserIndex ,(req,res)=>{
-    const userIndex = req.userIndex;
-    users.splice(userIndex,1);
-    return res.status(200).send({msg:"user deleted"});
+app.post('/login', (req,res,next)=>{
+    passport.authenticate("local", (err, user, info)=>{
+        if(err)
+            return next(err);
+        if(!user){
+            return res.status(401).json({ message: info?.message || "Login failed"})
+        }
+        req.logIn(user, (err)=>{
+            if(err) return next(err);
+            return res.json({message:"Login Successful", user})
+        })
+    })(req,res,next)
 })
 
 app.listen(PORT,()=>{
